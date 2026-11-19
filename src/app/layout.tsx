@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Playfair_Display, Plus_Jakarta_Sans } from 'next/font/google';
+import localFont from 'next/font/local';
 import './globals.css';
 import { CartProvider } from '@/components/public/CartProvider';
 import { ToastProvider } from '@/components/ui/Toast';
@@ -9,21 +9,25 @@ import { getStoreSettings } from '@/lib/settings';
  * Tipografi brand:
  * - Playfair Display untuk heading (kesan artisan & premium).
  * - Plus Jakarta Sans untuk body (keterbacaan tinggi di layar kecil).
- * Font dimuat dengan next/font/google sehingga di-host sendiri (tanpa request
- * ke Google pada saat runtime) dan bebas layout shift.
+ *
+ * Berkas font disimpan di src/app/fonts/ (variable font Latin 400-700, lisensi
+ * OFL) dan dimuat dengan next/font/local. Dengan cara ini build tidak lagi
+ * memanggil fonts.googleapis.com, sehingga terhindar dari kegagalan acak
+ * `next/font/google` saat Google membalas URL font tanpa ekstensi
+ * (vercel/next.js#99114). Font tetap di-host sendiri dan bebas layout shift.
  */
-const playfair = Playfair_Display({
-  subsets: ['latin'],
+const playfair = localFont({
+  src: './fonts/playfair-display-latin.woff2',
+  weight: '400 700',
   display: 'swap',
   variable: '--font-playfair',
-  weight: ['400', '500', '600', '700'],
 });
 
-const jakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
+const jakarta = localFont({
+  src: './fonts/plus-jakarta-sans-latin.woff2',
+  weight: '400 700',
   display: 'swap',
   variable: '--font-jakarta',
-  weight: ['400', '500', '600', '700'],
 });
 
 function siteUrl(): string {
