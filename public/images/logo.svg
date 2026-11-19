@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64" width="260" height="64">
+<g>
+<rect width="64" height="64" rx="16" fill="#26351F"/>
+<g fill="#DDAE35">
+<path d="M32 12c9 0 16 6.6 16 15v3H16v-3c0-8.4 7-15 16-15z" opacity=".95"/>
+<path d="M13 33h38c0 7-4 11-9 11H22c-5 0-9-4-9-11z"/>
+</g>
+<circle cx="32" cy="21" r="3.2" fill="#26351F"/>
+</g>
+<text x="74" y="30" font-family="Georgia, serif" font-size="24" font-weight="700" fill="#26351F">Dimsum Kita</text>
+<text x="75" y="48" font-family="Helvetica, Arial, sans-serif" font-size="11" letter-spacing="2.6" fill="#838655">HOMEMADE DIMSUM</text>
+</svg>

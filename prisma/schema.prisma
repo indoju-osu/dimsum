@@ -1,0 +1,311 @@
+// Prisma schema — PostgreSQL sebagai sumber kebenaran data.
+// Jalankan: npm run db:migrate  (membuat migration) lalu npm run db:seed.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enum
+// ---------------------------------------------------------------------------
+
+enum FulfillmentMethod {
+  PICKUP // Ambil sendiri
+  DELIVERY // Pengiriman
+}
+
+enum OrderStatus {
+  PENDING_CONFIRMATION // Menunggu Konfirmasi
+  PROCESSING // Diproses
+  READY_FOR_PICKUP // Siap Diambil
+  SHIPPING // Dalam Pengiriman
+  COMPLETED // Selesai
+  CANCELLED // Dibatalkan
+}
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+}
+
+enum UserRole {
+  ADMIN
+  STAFF
+}
+
+// ---------------------------------------------------------------------------
+// Pengguna admin
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(cuid())
+  username     String   @unique
+  name         String
+  // Hash password. WAJIB memakai Argon2id/bcrypt pada produksi.
+  // Untuk mode demonstrasi seed memakai scrypt (dependensi bawaan Node).
+  passwordHash String
+  role         UserRole @default(ADMIN)
+  isActive     Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  activities ActivityLog[]
+
+  @@index([username])
+  @@map("users")
+}
+
+// ---------------------------------------------------------------------------
+// Katalog
+// ---------------------------------------------------------------------------
+
+model Category {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  slug        String   @unique
+  description String?
+  image       String?
+  icon        String?
+  sortOrder   Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  products Product[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("categories")
+}
+
+model Product {
+  id          String @id @default(cuid())
+  name        String
+  slug        String @unique
+  shortDescription String?
+  description String
+  // Komposisi / bahan utama — HANYA diisi bila pemilik usaha menyediakannya.
+  ingredients String?
+  // Saran penyajian dan penyimpanan.
+  servingSuggestion String?
+  storageSuggestion String?
+  // Isi kemasan, mis. "5 pcs" / "500 gram".
+  contentLabel String
+  weightGram   Int?
+
+  categoryId String
+  category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  price         Int // Rupiah, bilangan bulat positif
+  discountPrice Int? // Harga setelah diskon (harus < price)
+  isPromo       Boolean @default(false)
+  promoStartsAt DateTime?
+  promoEndsAt   DateTime?
+
+  image       String
+  images      ProductImage[]
+  variants    ProductVariant[]
+
+  stock       Int     @default(0) // bilangan bulat non-negatif
+  isAvailable Boolean @default(true) // status ketersediaan yang diatur admin
+
+  isBestSeller Boolean @default(false)
+  isNewArrival Boolean @default(false)
+  isFeatured   Boolean @default(false)
+  isPublished  Boolean @default(true)
+
+  // Statistik ringan untuk sorting "Terpopuler".
+  soldCount Int @default(0)
+  viewCount Int @default(0)
+
+  // Rating hanya ditampilkan bila ada data ulasan nyata (ratingCount > 0).
+  ratingAverage Float?
+  ratingCount   Int     @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems OrderItem[]
+
+  @@index([slug])
+  @@index([categoryId])
+  @@index([isPublished, isAvailable])
+  @@index([isBestSeller])
+  @@index([isPromo])
+  @@index([isNewArrival])
+  @@index([createdAt])
+  @@map("products")
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  alt       String?
+  sortOrder Int     @default(0)
+
+  @@index([productId])
+  @@map("product_images")
+}
+
+model ProductVariant {
+  id              String  @id @default(cuid())
+  productId       String
+  product         Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name            String
+  // Selisih harga terhadap harga dasar produk (boleh negatif, tidak boleh
+  // membuat harga akhir <= 0 — divalidasi di server).
+  priceAdjustment Int     @default(0)
+  isDefault       Boolean @default(false)
+  sortOrder       Int     @default(0)
+
+  @@index([productId])
+  @@map("product_variants")
+}
+
+// ---------------------------------------------------------------------------
+// Pesanan
+// ---------------------------------------------------------------------------
+
+model Order {
+  id              String            @id @default(cuid())
+  orderNumber     String            @unique
+  customerName    String
+  customerPhone   String
+  address         String?
+  fulfillment     FulfillmentMethod @default(PICKUP)
+  note            String?
+  subtotal        Int
+  shippingCost    Int               @default(0)
+  total           Int
+  status          OrderStatus       @default(PENDING_CONFIRMATION)
+  // Menandai apakah stok sudah dipotong untuk pesanan ini.
+  // Stok dipotong saat admin memindahkan status ke PROCESSING.
+  stockCommitted  Boolean           @default(false)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  items OrderItem[]
+
+  @@index([orderNumber])
+  @@index([status])
+  @@index([createdAt])
+  @@map("orders")
+}
+
+model OrderItem {
+  id         String  @id @default(cuid())
+  orderId    String
+  order      Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId  String?
+  product    Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  // Snapshot data saat checkout agar riwayat pesanan tidak berubah bila
+  // produk diubah/dihapus.
+  productName String
+  variantName String?
+  image       String?
+  unitPrice   Int
+  quantity    Int
+  subtotal    Int
+
+  @@index([orderId])
+  @@map("order_items")
+}
+
+// ---------------------------------------------------------------------------
+// Konten
+// ---------------------------------------------------------------------------
+
+model Article {
+  id          String        @id @default(cuid())
+  title       String
+  slug        String        @unique
+  excerpt     String
+  content     String
+  coverImage  String?
+  category    String        @default("Tips")
+  status      ArticleStatus @default(DRAFT)
+  publishedAt DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([slug])
+  @@index([status])
+  @@index([publishedAt])
+  @@map("articles")
+}
+
+model Testimonial {
+  id        String   @id @default(cuid())
+  name      String
+  role      String?
+  rating    Int      @default(5)
+  content   String
+  photo     String?
+  isVisible Boolean  @default(true)
+  // true = data demonstrasi bawaan seed, ditampilkan sebagai "contoh ulasan"
+  // sampai administrator menggantinya dengan ulasan asli.
+  isDemoData Boolean @default(false)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isVisible])
+  @@map("testimonials")
+}
+
+// ---------------------------------------------------------------------------
+// Pengaturan toko (satu baris / singleton)
+// ---------------------------------------------------------------------------
+
+model StoreSettings {
+  id            String  @id @default("singleton")
+  brandName     String  @default("Dimsum Kita")
+  logo          String?
+  favicon       String?
+  description   String  @default("")
+  whatsappNumber String @default("")
+  address       String  @default("")
+  operatingHours String @default("")
+  instagram     String  @default("")
+  tiktok        String  @default("")
+  email         String  @default("")
+  shippingInfo  String  @default("")
+  paymentInfo   String  @default("")
+  // Ongkos kirim dasar (Rupiah). 0 = gratis / belum dikonfigurasi.
+  shippingCost  Int     @default(0)
+  // Minimum belanja untuk gratis ongkir. null = tidak ada promo gratis ongkir.
+  freeShippingMin Int?
+  seoTitle      String  @default("")
+  seoDescription String @default("")
+  seoKeywords   String  @default("")
+  updatedAt     DateTime @updatedAt
+
+  @@map("store_settings")
+}
+
+// ---------------------------------------------------------------------------
+// Log aktivitas admin (ringkasan "Aktivitas Terbaru" di dashboard)
+// ---------------------------------------------------------------------------
+
+model ActivityLog {
+  id          String   @id @default(cuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  actor       String
+  action      String
+  entity      String
+  entityId    String?
+  description String
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("activity_logs")
+}

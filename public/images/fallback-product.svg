@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+<rect width="1000" height="1000" fill="#E9E5DA"/>
+<g transform="translate(500 430) scale(6.2)" opacity="0.9"><rect x="-32" y="-32" width="64" height="64" rx="16" fill="#CFB799"/><g fill="#838655"><path d="M0-20c9 0 16 6.6 16 15v3h-32v-3c0-8.4 7-15 16-15z"/><path d="M-19 1h38c0 7-4 11-9 11h-20c-5 0-9-4-9-11z"/></g></g>
+<text x="500" y="700" font-family="Georgia, serif" font-size="46" fill="#26351F" text-anchor="middle">Foto produk belum tersedia</text>
+<text x="500" y="756" font-family="Helvetica, Arial, sans-serif" font-size="26" fill="#838655" text-anchor="middle">Foto ilustrasi akan diperbarui oleh admin</text>
+</svg>
